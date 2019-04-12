@@ -110,6 +110,7 @@ int             growproc(int);
 int             kill(int);
 struct cpu*     mycpu(void);
 struct proc*    myproc();
+struct thread*  my_thread();
 void            pinit(void);
 void            procdump(void);
 void            scheduler(void) __attribute__((noreturn));
