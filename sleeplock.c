@@ -16,7 +16,7 @@ initsleeplock(struct sleeplock *lk, char *name)
   initlock(&lk->lk, "sleep lock");
   lk->name = name;
   lk->locked = 0;
-  lk->pid = 0;
+  lk->tid = 0;
 }
 
 void
@@ -27,7 +27,7 @@ acquiresleep(struct sleeplock *lk)
     sleep(lk, &lk->lk);
   }
   lk->locked = 1;
-  lk->pid = my_thread()->tid;
+  lk->tid = my_thread()->tid;
   release(&lk->lk);
 }
 
@@ -36,7 +36,7 @@ releasesleep(struct sleeplock *lk)
 {
   acquire(&lk->lk);
   lk->locked = 0;
-  lk->pid = 0;
+  lk->tid = 0;
   wakeup(lk);
   release(&lk->lk);
 }
@@ -47,7 +47,7 @@ holdingsleep(struct sleeplock *lk)
   int r;
   
   acquire(&lk->lk);
-  r = lk->locked && (lk->pid == my_thread()->tid);
+  r = lk->locked && (lk->tid == my_thread()->tid);
   release(&lk->lk);
   return r;
 }

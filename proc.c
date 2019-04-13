@@ -164,14 +164,14 @@ userinit(void)
   memset(thread->tf, 0, sizeof(*thread->tf));
   thread->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   thread->tf->ds = (SEG_UDATA << 3) | DPL_USER;
-  thread->tf->es = p->tf->ds;
-  thread->tf->ss = p->tf->ds;
+  thread->tf->es = thread->tf->ds;
+  thread->tf->ss = thread->tf->ds;
   thread->tf->eflags = FL_IF;
   thread->tf->esp = PGSIZE;
   thread->tf->eip = 0;  // beginning of initcode.S
 
   safestrcpy(thread->proc->name, "initcode", sizeof(p->name));
-  thread->prop->cwd = namei("/");
+  thread->proc->cwd = namei("/");
 
   // this assignment to p->state lets other cores
   // run this process. the acquire forces the above
@@ -380,14 +380,14 @@ scheduler(void)
           // before jumping back to us.
           c->thread = t;
           switchuvm(t);
-          t->state = RUNNING;
+          t->t_state = RUNNING;
 
           swtch(&(c->scheduler), t->context);
           switchkvm();
 
           // Process is done running for now.
           // It should have changed its p->state before coming back.
-          c->proc = 0;
+          c->thread = 0;
       }
     }
     release(&p->lock);
@@ -430,10 +430,10 @@ void
 yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
-  acquire(&myproc->lock);  //DOC: yieldlock
+  acquire(&myproc()->lock);  //DOC: yieldlock
   my_thread()->t_state = RUNNABLE;
   sched();
-  release(&myproc->lock);  //DOC: yieldlock
+  release(&myproc()->lock);  //DOC: yieldlock
   release(&ptable.lock);
 }
 
@@ -485,7 +485,7 @@ sleep(void *chan, struct spinlock *lk)
   acquire(&p->lock);
   // Go to sleep.
   t->chan = chan;
-  t->state = SLEEPING;
+  t->t_state= SLEEPING;
 
   sched();
 

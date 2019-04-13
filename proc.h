@@ -1,5 +1,6 @@
 #define NTHREADS 16
 
+
 // Per-CPU state
 struct cpu {
     uchar apicid;                // Local APIC ID
