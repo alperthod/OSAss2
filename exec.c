@@ -87,7 +87,7 @@ exec(char *path, char **argv)
   sp -= (3+argc+1) * 4;
   if(copyout(pgdir, sp, ustack, (3+argc+1)*4) < 0)
     goto bad;
-
+//TODO kill threads
   // Save program name for debugging.
   for(last=s=path; *s; s++)
     if(*s == '/')
