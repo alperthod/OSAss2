@@ -1,3 +1,4 @@
+#include <jmorecfg.h>
 #include "types.h"
 #include "defs.h"
 #include "param.h"
@@ -6,6 +7,8 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "kthread.h"
+
 
 struct {
   struct spinlock lock;
@@ -627,4 +630,60 @@ procdump(void)
       }
       cprintf("\n");
   }
+}
+
+
+int kthread_create(void (*start_func)(), void* stack){
+    //TODO
+    return 0;
+}
+
+int kthread_id(){
+    return my_thread()->tid;
+}
+
+void kthread_exit(){
+    //struct proc *curproc = myproc();
+    struct thread * curr_thread = my_thread();
+    boolean lastthread = TRUE;
+    struct proc* proc = myproc();
+    acquire(&proc->proclock);
+    struct thread * t;
+    for (t = proc->threads; t < &proc->threads[NTHREADS]; t++){
+        if(t->t_state == T_RUNNABLE | t->t_state==T_RUNNING |t->t_state == T_SLEEPING) {
+            lastthread = FALSE;
+            break;
+        }
+
+    }
+    if(lastthread){
+        exit();
+    }else {
+        curr_thread->t_state = T_TERMINATED;
+        sched();
+        panic("zombie kthread_exit");
+    }
+}
+
+}
+
+int kthread_join(int thread_id){
+    //TODO
+
+}
+
+int kthread_mutex_alloc(){
+
+}
+
+int kthread_mutex_dealloc(int mutex_id){
+
+}
+
+int kthread_mutex_lock(int mutex_id{
+
+}
+
+int kthread_mutex_unlock(int mutex_id){
+
 }

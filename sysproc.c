@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "kthread.h"
 
 int
 sys_fork(void)
@@ -89,3 +90,25 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int
+sys_kthread_create(void){
+   return kthread_create(,);
+}
+
+int
+sys_khread_id(void){
+  return kthread_id();     //error?
+}
+
+int
+sys_kthread_exit(void){
+  kthread_exit();
+  return 0; //not reached
+}
+
+int
+sys_kthread_join(void){
+
+}
+
