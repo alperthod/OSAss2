@@ -1,5 +1,5 @@
-#define NTHREADS 16
-
+#include "param.h"
+#include "spinlock.h"
 
 // Per-CPU state
 struct cpu {
@@ -11,6 +11,7 @@ struct cpu {
     int ncli;                    // Depth of pushcli nesting.
     int intena;                  // Were interrupts enabled before pushcli?
     struct thread *thread;       // The thread running on this cpu or null
+    struct proc * proc;
 };
 
 extern struct cpu cpus[NCPU];
@@ -35,24 +36,8 @@ struct context {
     uint eip;
 };
 
-enum state {
-    UNUSED, EMBRYO, USABLE, ZOMBIE, SLEEPING, RUNNABLE, RUNNING, TERMINATED, TERMINATING
-};
-
-// Per-process state
-struct proc {
-    uint sz;                     // Size of process memory (bytes)
-    pde_t *pgdir;                // Page table
-    enum state state;        // Process state
-    int pid;                     // Process ID
-    struct proc *parent;         // Parent process
-    int killed;                  // If non-zero, have been killed
-    struct file *ofile[NOFILE];  // Open files
-    struct inode *cwd;           // Current directory
-    char name[16];               // Process name (debugging)
-    struct spinlock lock;        // for using growproc or any other process resources
-    struct thread * threads[NTHREADS]; //threads of the process
-};
+enum procstate { UNUSED, EMBRYO, USED, ZOMBIE };
+enum threadstate { T_UNUSED, T_RUNNABLE, T_RUNNING, T_SLEEPING , T_TERMINATED};
 
 // Process memory is laid out contiguously, low addresses first:
 //   text
@@ -61,11 +46,25 @@ struct proc {
 //   expandable heap
 struct thread {
     char *kstack;                // Bottom of kernel stack for this thread
-    enum state t_state;   // Thread state
+    enum threadstate t_state;   // Thread state
     int tid;                     // Thread ID
     struct trapframe *tf;        // Trap frame for current syscall
     struct context *context;     // swtch() here to run process
     void *chan;                  // If non-zero, sleeping on chan
     struct proc *proc;           // process
-    struct thread_table *threads; // Process threads
+};
+
+// Per-process state
+struct proc {
+    uint sz;                     // Size of process memory (bytes)
+    pde_t *pgdir;                // Page table
+    enum procstate state;        // Process state
+    int pid;                     // Process ID
+    struct proc *parent;         // Parent process
+    int killed;                  // If non-zero, have been killed
+    struct file *ofile[NOFILE];  // Open files
+    struct inode *cwd;           // Current directory
+    char name[16];               // Process name (debugging)
+    struct spinlock proclock;    // Lock in the process context
+    struct thread threads[NTHREADS]; //threads of the process
 };

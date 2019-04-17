@@ -1,9 +1,11 @@
 # Compiled class file
 *.class
-
+entryother
 target/
 .idea/
-
+initcode
+initcode.out
+kernel
 # Log file
 *.log
 
@@ -21,6 +23,7 @@ target/
 *.zip
 *.tar.gz
 *.rar
+*.S
 
 bootblock
 *.img
@@ -32,3 +35,6 @@ _*
 *.sym
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+
+CMakeLists.txt
+cmake-build-debug/
