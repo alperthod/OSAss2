@@ -98,3 +98,21 @@ int sys_kthread_create(void) {
         return -1;
     return kthread_create(start_func, stack);
 }
+
+
+int
+sys_khread_id(void){
+    return kthread_id();     //error?
+}
+
+int
+sys_kthread_exit(void){
+    kthread_exit();
+    return 0; //not reached
+}
+
+int
+sys_kthread_join(void){
+
+}
+
