@@ -108,9 +108,10 @@ int sys_kthread_join(void) {
 }
 
 int sys_kthread_id(){
-    return 0;
+    return kthread_id();
 }
 
 int sys_kthread_exit(){
-    return 0;
+    kthread_exit();
+    return 0; //not reached
 }

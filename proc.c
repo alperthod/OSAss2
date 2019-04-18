@@ -78,7 +78,7 @@ static struct thread* alloc_thread(struct proc* proc) {
         panic("proclock must be held while allocating thread");
     struct thread * t;
     for (t = proc->threads; t < &proc->threads[NTHREADS]; t++) {
-        if (t->t_state != T_UNUSED)
+        if (t->t_state != T_UNUSED && t->t_state!= T_TERMINATED)
             continue;
         t->tid = nextpid++;
         char *sp;
@@ -637,7 +637,9 @@ int kthread_create(void (*start_func)(), void * user_stack) {
     struct thread * t;
     acquire(&p->proclock);
 
-    if ((t = alloc_thread(p))==0) return 0;
+    if ((t = alloc_thread(p))==0) {
+        release(&p->proclock);
+        return 0;}
 
     *t->tf = *curthread->tf;
     t->tf->eip = (uint)start_func;
@@ -669,4 +671,36 @@ int kthread_join(int thread_id){
     }
     release(&currproc->proclock);
     return -1;
+}
+
+int kthread_id(){
+    return my_thread()->tid;
+}
+
+void kthread_exit(){
+    //struct proc *curproc = myproc();
+    struct thread * curr_thread = my_thread();
+    int lastthread = 1;
+    struct proc* proc = myproc();
+    acquire(&proc->proclock);
+    struct thread * t;
+    for (t = proc->threads; t < &proc->threads[NTHREADS]; t++){
+        if(t->t_state == T_RUNNABLE || t->t_state==T_RUNNING || t->t_state == T_SLEEPING) {
+            lastthread = 0;
+            break;
+        }
+
+    }
+    if(lastthread){
+        release(&proc->proclock);
+        exit();
+    }else {
+        curr_thread->t_state = T_TERMINATED;
+        release(&proc->proclock);
+        wakeup(proc);
+        acquire(&ptable.lock);
+        acquire(&proc->proclock);
+        sched();
+        panic("zombie kthread_exit");
+    }
 }
