@@ -649,3 +649,24 @@ int kthread_create(void (*start_func)(), void * user_stack) {
 
     return t->tid;
 }
+
+int kthread_join(int thread_id){
+    struct proc * currproc = myproc();
+    struct thread* thread;
+    acquire(&currproc->proclock);
+    for (thread = currproc->threads; thread < &currproc->threads[NTHREADS]; thread++){
+        if(thread->tid == thread_id){
+            if (thread->t_state == T_TERMINATED || thread->t_state == T_UNUSED){
+                release(&currproc->proclock);
+                return 0;
+            }
+            while (thread->t_state != T_TERMINATED){
+                sleep(currproc, &currproc->proclock);
+            }
+            release(&currproc->proclock);
+            return 0;
+        }
+    }
+    release(&currproc->proclock);
+    return -1;
+}
