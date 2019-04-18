@@ -72,8 +72,10 @@ myproc(void) {
   return t == 0 ? 0 : t->proc;
 }
 
+//assuming proclock is held
 static struct thread* alloc_thread(struct proc* proc) {
-    acquire(&proc->proclock);
+    if (!holding(&proc->proclock))
+        panic("proclock must be held while allocating thread");
     struct thread * t;
     for (t = proc->threads; t < &proc->threads[NTHREADS]; t++) {
         if (t->t_state != T_UNUSED)
@@ -83,7 +85,6 @@ static struct thread* alloc_thread(struct proc* proc) {
 
         // Allocate kernel stack.
         if((t->kstack = kalloc()) == 0) {
-            release(&proc->proclock);
             return 0;
         }
         sp = t->kstack + KSTACKSIZE;
@@ -101,10 +102,9 @@ static struct thread* alloc_thread(struct proc* proc) {
         t->context = (struct context*)sp;
         memset(t->context, 0, sizeof *t->context);
         t->context->eip = (uint)forkret;
-        release(&proc->proclock);
+        t->chan = 0;
         return t;
     }
-    release(&proc->proclock);
     return 0;
 }
 //PAGEBREAK: 32
@@ -135,8 +135,10 @@ found:
   }
 // initializing proclock
   initlock(&p->proclock, "process lock");
+  acquire(&p->proclock);
   struct thread * t = alloc_thread(p);
-  if (t == 0){
+  release(&p->proclock);
+    if (t == 0){
       release(&ptable.lock);
       return 0;
   }
@@ -627,4 +629,23 @@ procdump(void)
       }
       cprintf("\n");
   }
+}
+
+int kthread_create(void (*start_func)(), void * user_stack) {
+    struct proc * p = myproc();
+    struct thread * curthread = my_thread();
+    struct thread * t;
+    acquire(&p->proclock);
+
+    if ((t = alloc_thread(p))==0) return 0;
+
+    *t->tf = *curthread->tf;
+    t->tf->eip = (uint)start_func;
+    t->tf->esp = (uint)user_stack;
+
+    t->t_state = T_RUNNABLE;
+
+    release(&p->proclock);
+
+    return t->tid;
 }
