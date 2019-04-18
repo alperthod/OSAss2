@@ -1,4 +1,3 @@
-#include <jmorecfg.h>
 #include "types.h"
 #include "defs.h"
 #include "param.h"
@@ -661,21 +660,26 @@ int kthread_id(){
 void kthread_exit(){
     //struct proc *curproc = myproc();
     struct thread * curr_thread = my_thread();
-    boolean lastthread = TRUE;
+    int lastthread = 1;
     struct proc* proc = myproc();
     acquire(&proc->proclock);
     struct thread * t;
     for (t = proc->threads; t < &proc->threads[NTHREADS]; t++){
         if(t->t_state == T_RUNNABLE | t->t_state==T_RUNNING |t->t_state == T_SLEEPING) {
-            lastthread = FALSE;
+            lastthread = 0;
             break;
         }
 
     }
     if(lastthread){
+        release(&proc->proclock);
         exit();
     }else {
         curr_thread->t_state = T_TERMINATED;
+        release(&proc->proclock);
+        wakeup(proc);
+        acquire(&ptable.lock);
+        acquire(&proc->proclock);
         sched();
         panic("zombie kthread_exit");
     }
