@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "kthread.h"
 
 struct {
   struct spinlock lock;
@@ -17,7 +18,7 @@ static struct proc *initproc;
 int nextpid = 1;
 extern void forkret(void);
 extern void trapret(void);
-
+int is_last_thread();
 static void wakeup1(void *chan);
 
 void
@@ -274,17 +275,25 @@ exit(void)
   struct thread * curr_thread = my_thread();
   struct proc *p;
   int fd;
-
+  //if this is the first thread that's get exit call need to signal all other threads to exit
   if(curproc == initproc)
     panic("init exiting");
 
-  // Close all open files.
-  for(fd = 0; fd < NOFILE; fd++){
-    if(curproc->ofile[fd]){
-      fileclose(curproc->ofile[fd]);
-      curproc->ofile[fd] = 0;
+    acquire(&curproc->proclock);
+    if (!curr_thread->killed) {
+        curproc->killed = 1;
+
     }
-  }
+
+  if (is_last_thread()) {
+    release(&curproc->proclock);
+    // Close all open files.
+    for (fd = 0; fd < NOFILE; fd++) {
+        if (curproc->ofile[fd]) {
+            fileclose(curproc->ofile[fd]);
+            curproc->ofile[fd] = 0;
+        }
+    }
 
   begin_op();
   iput(curproc->cwd);
@@ -297,20 +306,12 @@ exit(void)
   wakeup1(curproc->parent);
 
   // Pass abandoned children to init.
-  struct thread* thread;
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->parent == curproc){
-    p->parent = initproc;
-//      pass abandoned children's threads to init.
-    acquire(&p->proclock);
-    for (thread = p->threads; thread < &p->threads[NTHREADS]; thread++){
-       thread->proc = initproc;
-    }
-    release(&p->proclock);
-    if(p->state == ZOMBIE)
-       wakeup1(initproc);
-    }
-
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+      if (p->parent == curproc) {
+          p->parent = initproc;
+          if (p->state == ZOMBIE)
+              wakeup1(initproc);
+      }
   }
 
   // Jump into the scheduler, never to return.
@@ -319,6 +320,11 @@ exit(void)
   curr_thread->t_state = T_TERMINATED;
   sched();
   panic("zombie exit");
+    }
+  else {
+      release(&curproc->proclock);
+      kthread_exit();
+    }
 }
 
 // Wait for a child process to exit and return its pid.
@@ -687,15 +693,8 @@ void kthread_exit(){
     int lastthread = 1;
     struct proc* proc = myproc();
     acquire(&proc->proclock);
-    struct thread * t;
-    for (t = proc->threads; t < &proc->threads[NTHREADS]; t++){
-        if(t->t_state == T_RUNNABLE || t->t_state==T_RUNNING || t->t_state == T_SLEEPING) {
-            lastthread = 0;
-            break;
-        }
-
-    }
-    if(lastthread){
+    curr_thread->killed = 1;
+    if (is_last_thread()) {
         release(&proc->proclock);
         exit();
     }else {
@@ -707,4 +706,23 @@ void kthread_exit(){
         sched();
         panic("zombie kthread_exit");
     }
+}
+
+//proclock must be held
+int is_last_thread() {
+    struct thread *curr_thread = my_thread();
+    struct proc *proc = myproc();
+    struct thread *t;
+    if (!holding(&proc->proclock))
+        panic(("proclock must be held before calling is_last_thread"));
+    int last_thread = 1;
+    for (t = proc->threads; t < &proc->threads[NTHREADS]; t++) {
+        if ((t->t_state == T_RUNNABLE || t->t_state == T_RUNNING || t->t_state == T_SLEEPING) &&
+            t->tid != curr_thread->tid) {
+            last_thread = 0;
+            break;
+        }
+
+    }
+    return last_thread;
 }

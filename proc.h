@@ -52,6 +52,7 @@ struct thread {
     struct context *context;     // swtch() here to run process
     void *chan;                  // If non-zero, sleeping on chan
     struct proc *proc;           // process
+    int killed;
 };
 
 // Per-process state
