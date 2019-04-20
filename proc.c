@@ -181,7 +181,9 @@ userinit(void)
   // writes to be visible, and the lock is also needed
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
+  acquire(&proc->proclock);
   thread->t_state = T_RUNNABLE;
+  release(&proc->proclock);
   release(&ptable.lock);
 }
 
@@ -228,14 +230,15 @@ fork(void)
         return -1;
     }
     new_thread = &new_proc->threads[0];
-
-    acquire(&curr_thread->proc->proclock);
+  acquire(&ptable.lock);
+  acquire(&curr_thread->proc->proclock);
     // Copy process state from proc.
   if((new_thread->proc->pgdir = copyuvm(curr_thread->proc->pgdir, curr_thread->proc->sz)) == 0){
     kfree(new_thread->kstack);
     new_thread->kstack = 0;
     new_thread->t_state = T_UNUSED;
     release(&curr_thread->proc->proclock);
+    release(&ptable.lock);
     return -1;
   }
   new_thread->proc->sz = curr_thread->proc->sz;
@@ -257,7 +260,7 @@ fork(void)
   new_thread->t_state = T_RUNNABLE;
   new_thread->proc->state = USED;
   release(&curr_thread->proc->proclock);
-
+  release(&ptable.lock);
   return pid;
 }
 
@@ -297,16 +300,17 @@ exit(void)
   struct thread* thread;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
-      p->parent = initproc;
+    p->parent = initproc;
 //      pass abandoned children's threads to init.
-        acquire(&p->proclock);
-        for (thread = p->threads; thread < &p->threads[NTHREADS]; thread++){
-            thread->proc = initproc;
-        }
-        release(&p->proclock);
-      if(p->state == ZOMBIE)
-        wakeup1(initproc);
+    acquire(&p->proclock);
+    for (thread = p->threads; thread < &p->threads[NTHREADS]; thread++){
+       thread->proc = initproc;
     }
+    release(&p->proclock);
+    if(p->state == ZOMBIE)
+       wakeup1(initproc);
+    }
+
   }
 
   // Jump into the scheduler, never to return.
@@ -347,13 +351,14 @@ wait(void)
                 thread->proc = 0;
             }
         }
-        release(&p->proclock);
+
         freevm(p->pgdir);
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+        release(&p->proclock);
         release(&ptable.lock);
         return pid;
       }
@@ -364,7 +369,6 @@ wait(void)
       release(&ptable.lock);
       return -1;
     }
-
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
   }
@@ -531,7 +535,7 @@ sleep(void *chan, struct spinlock *lk)
 static void
 wakeup1(void *chan) {
     struct proc *p;
-struct thread* thread;
+    struct thread* thread;
 
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
         if (p->state == USED) {
