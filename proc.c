@@ -180,13 +180,15 @@ userinit(void) {
     safestrcpy(proc->name, "initcode", sizeof(proc->name));
     proc->cwd = namei("/");
 
-    // this assignment to p->state lets other cores
-    // run this process. the acquire forces the above
-    // writes to be visible, and the lock is also needed
-    // because the assignment might not be atomic.
-    acquire(&ptable.lock);
-    thread->t_state = T_RUNNABLE;
-    release(&ptable.lock);
+  // this assignment to p->state lets other cores
+  // run this process. the acquire forces the above
+  // writes to be visible, and the lock is also needed
+  // because the assignment might not be atomic.
+  acquire(&ptable.lock);
+  acquire(&proc->proclock);
+  thread->t_state = T_RUNNABLE;
+  release(&proc->proclock);
+  release(&ptable.lock);
 }
 
 // Grow current process's memory by n bytes.
@@ -230,19 +232,20 @@ fork(void) {
         return -1;
     }
     new_thread = &new_proc->threads[0];
-
-    acquire(&curr_thread->proc->proclock);
+  acquire(&ptable.lock);
+  acquire(&curr_thread->proc->proclock);
     // Copy process state from proc.
-    if ((new_thread->proc->pgdir = copyuvm(curr_thread->proc->pgdir, curr_thread->proc->sz)) == 0) {
-        kfree(new_thread->kstack);
-        new_thread->kstack = 0;
-        new_thread->t_state = T_UNUSED;
-        release(&curr_thread->proc->proclock);
-        return -1;
-    }
-    new_thread->proc->sz = curr_thread->proc->sz;
-    new_thread->proc->parent = curr_thread->proc;
-    *new_thread->tf = *curr_thread->tf;
+  if((new_thread->proc->pgdir = copyuvm(curr_thread->proc->pgdir, curr_thread->proc->sz)) == 0){
+    kfree(new_thread->kstack);
+    new_thread->kstack = 0;
+    new_thread->t_state = T_UNUSED;
+    release(&curr_thread->proc->proclock);
+    release(&ptable.lock);
+    return -1;
+  }
+  new_thread->proc->sz = curr_thread->proc->sz;
+  new_thread->proc->parent = curr_thread->proc;
+  *new_thread->tf = *curr_thread->tf;
 
     // Clear %eax so that fork returns 0 in the child.
     new_thread->tf->eax = 0;
@@ -255,12 +258,12 @@ fork(void) {
 
     safestrcpy(new_thread->proc->name, curr_thread->proc->name, sizeof(curr_thread->proc->name));
 
-    pid = new_thread->proc->pid;
-    new_thread->t_state = T_RUNNABLE;
-    new_thread->proc->state = USED;
-    release(&curr_thread->proc->proclock);
-
-    return pid;
+  pid = new_thread->proc->pid;
+  new_thread->t_state = T_RUNNABLE;
+  new_thread->proc->state = USED;
+  release(&curr_thread->proc->proclock);
+  release(&ptable.lock);
+  return pid;
 }
 
 // Exit the current process.  Does not return.
@@ -326,53 +329,54 @@ exit(void) {
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int
-wait(void) {
-    struct proc *p;
-    int havekids, pid;
-    struct thread *thread;
-    struct proc *curproc = myproc();
-
-    acquire(&ptable.lock);
-    for (;;) {
-        // Scan through table looking for exited children.
-        havekids = 0;
-        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-            if (p->parent != curproc)
-                continue;
-            havekids = 1;
-            if (p->state == ZOMBIE) {
-                // Found one.
-                pid = p->pid;
-                acquire(&p->proclock);
-                for (thread = p->threads; thread < &p->threads[NTHREADS]; thread++) {
-                    if (thread->t_state != T_UNUSED) {
-                        kfree(thread->kstack);
-                        thread->kstack = 0;
-                        thread->t_state = T_UNUSED;
-                        thread->proc = 0;
-                    }
-                }
-                release(&p->proclock);
-                freevm(p->pgdir);
-                p->pid = 0;
-                p->parent = 0;
-                p->name[0] = 0;
-                p->killed = 0;
-                p->state = UNUSED;
-                release(&ptable.lock);
-                return pid;
+wait(void)
+{
+  struct proc *p;
+  int havekids, pid;
+  struct thread * thread;
+  struct proc *curproc = myproc();
+  
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent != curproc)
+        continue;
+      havekids = 1;
+      if(p->state == ZOMBIE){
+        // Found one.
+        pid = p->pid;
+        acquire(&p->proclock);
+        for (thread = p->threads ; thread < &p->threads[NTHREADS] ; thread++){
+            if(thread->t_state != T_UNUSED) {
+                kfree(thread->kstack);
+                thread->kstack = 0;
+                thread->t_state = T_UNUSED;
+                thread->proc = 0;
             }
         }
-
-        // No point waiting if we don't have any children.
-        if (!havekids || curproc->killed) {
-            release(&ptable.lock);
-            return -1;
-        }
-
-        // Wait for children to exit.  (See wakeup1 call in proc_exit.)
-        sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+        freevm(p->pgdir);
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        release(&p->proclock);
+        release(&ptable.lock);
+        return pid;
+      }
     }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+  }
 }
 
 //PAGEBREAK: 42
@@ -531,7 +535,7 @@ sleep(void *chan, struct spinlock *lk) {
 static void
 wakeup1(void *chan) {
     struct proc *p;
-    struct thread *thread;
+    struct thread* thread;
 
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
         if (p->state == USED) {
