@@ -277,7 +277,7 @@ exit(void)
   int fd;
   //if this is the first thread that's get exit call need to signal all other threads to exit
   if(curproc == initproc)
-    panic("init exiting");
+      panic("init exiting");
 
     acquire(&curproc->proclock);
     if (!curr_thread->killed) {
@@ -286,7 +286,7 @@ exit(void)
     }
 
   if (is_last_thread()) {
-    release(&curproc->proclock);
+      release(&curproc->proclock);
     // Close all open files.
     for (fd = 0; fd < NOFILE; fd++) {
         if (curproc->ofile[fd]) {
@@ -690,7 +690,6 @@ int kthread_id(){
 void kthread_exit(){
     //struct proc *curproc = myproc();
     struct thread * curr_thread = my_thread();
-    int lastthread = 1;
     struct proc* proc = myproc();
     acquire(&proc->proclock);
     curr_thread->killed = 1;

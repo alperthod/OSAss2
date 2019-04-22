@@ -8,7 +8,7 @@ initcode.out
 kernel
 # Log file
 *.log
-
+/Project_Test
 # BlueJ files
 *.ctxt
 
