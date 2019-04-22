@@ -13,9 +13,16 @@ struct {
   struct proc proc[NPROC];
 } ptable;
 
+struct{
+    struct spinlock lock;
+    pthread_mutex_t mutexes[MAX_MUTEXES];
+}mtable;
+
+
 static struct proc *initproc;
 
 int nextpid = 1;
+int nextmid = 1;
 extern void forkret(void);
 extern void trapret(void);
 int is_last_thread();
@@ -724,4 +731,89 @@ int is_last_thread() {
 
     }
     return last_thread;
+}
+
+
+int kthread_mutex_alloc(){
+    acquire(&mtable.lock);
+    pthread_mutex_t* mutex;
+    for(mutex = mtable.mutexes ; mutex < &mtable.mutexes[MAX_MUTEXES];mutex++)
+        if (mutex->m_state == M_UNUSED)
+           goto found;
+
+    release(&mtable.lock);
+    return -1;
+
+
+ found:
+    mutex->m_state = M_USED;
+    mutex->id = nextmid++;
+
+// initializing mutexlock
+    initlock(&mutex->lock, "mutex lock");
+    release(&mtable.lock);
+    return mutex->id;
+
+}
+
+int kthread_mutex_dealloc(int mutex_id){
+    acquire(&mtable);
+    pthread_mutex_t* mutex;
+    for(mutex = mtable.mutexes ; mutex < &mtable.mutexes[MAX_MUTEXES];mutex++)
+        if (mutex->id == mutex_id)
+            goto found;
+
+    release(&mtable.lock);
+    return -1;
+
+
+    found:
+    if (mutex->m_state = M_LOCKED){
+        return -1;
+    }
+    acquire(&mutex->lock);
+    mutex->m_state = UNUSED;
+    mutex->id = -1;
+    release(&mutex->lock);
+    release(&mtable.lock);
+    return 0;
+}
+
+
+int kthread_mutex_lock(int mutex_id){
+    //acquire(&mtable);             not sure if needed
+    pthread_mutex_t* mutex;
+    for(mutex = mtable.mutexes ; mutex < &mtable.mutexes[MAX_MUTEXES];mutex++)
+        if (mutex->id == mutex_id)
+            goto found;
+
+    release(&mtable.lock);
+    return -1;
+
+
+    found:
+    acquiresleep(&mutex->lock);
+    mutex->m_state = M_LOCKED;
+
+    //release(&mtable.lock);    not sure if needed
+    return 0;
+}
+
+int kthread_mutex_unlock(int mutex_id){
+    //acquire(&mtable);             not sure if needed
+    pthread_mutex_t* mutex;
+    for(mutex = mtable.mutexes ; mutex < &mtable.mutexes[MAX_MUTEXES];mutex++)
+        if (mutex->id == mutex_id)
+            goto found;
+
+    release(&mtable.lock);
+    return -1;
+
+
+    found:
+
+    mutex->m_state = USED;
+    releasesleep(&mutex->lock);
+    //release(&mtable.lock);    not sure if needed
+    return 0;
 }

@@ -38,6 +38,7 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, USED, ZOMBIE };
 enum threadstate { T_UNUSED, T_RUNNABLE, T_RUNNING, T_SLEEPING , T_TERMINATED};
+enum mutexstate {M_UNUSED,M_USED, M_LOCKED};
 
 // Process memory is laid out contiguously, low addresses first:
 //   text
@@ -69,3 +70,9 @@ struct proc {
     struct spinlock proclock;    // Lock in the process context
     struct thread threads[NTHREADS]; //threads of the process
 };
+
+typedef struct {
+    struct spinlock lock;
+    int id;
+    enum mutexstate m_state;
+}pthread_mutex_t;
