@@ -739,13 +739,13 @@ int kthread_mutex_alloc(){
     pthread_mutex_t* mutex;
     for(mutex = mtable.mutexes ; mutex < &mtable.mutexes[MAX_MUTEXES];mutex++)
         if (mutex->m_state == M_UNUSED)
-           goto found;
+            goto found;
 
     release(&mtable.lock);
     return -1;
 
 
- found:
+    found:
     mutex->m_state = M_USED;
     mutex->id = nextmid++;
 
@@ -778,7 +778,6 @@ int kthread_mutex_dealloc(int mutex_id){
     release(&mtable.lock);
     return 0;
 }
-
 
 int kthread_mutex_lock(int mutex_id){
     //acquire(&mtable);             not sure if needed
