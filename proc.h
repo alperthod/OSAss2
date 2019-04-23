@@ -1,5 +1,6 @@
 #include "param.h"
 #include "spinlock.h"
+#include "sleeplock.h"
 
 // Per-CPU state
 struct cpu {
@@ -38,7 +39,7 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, USED, ZOMBIE };
 enum threadstate { T_UNUSED, T_RUNNABLE, T_RUNNING, T_SLEEPING , T_TERMINATED};
-enum mutexstate {M_UNUSED,M_USED, M_LOCKED};
+enum mutexstate {M_UNUSED,M_USED};
 
 // Process memory is laid out contiguously, low addresses first:
 //   text
@@ -48,7 +49,7 @@ enum mutexstate {M_UNUSED,M_USED, M_LOCKED};
 struct thread {
     char *kstack;                // Bottom of kernel stack for this thread
     enum threadstate t_state;   // Thread state
-    int tid;                     // Thread ID
+    volatile int tid;                     // Thread ID
     struct trapframe *tf;        // Trap frame for current syscall
     struct context *context;     // swtch() here to run process
     void *chan;                  // If non-zero, sleeping on chan
@@ -72,7 +73,7 @@ struct proc {
 };
 
 typedef struct {
-    struct spinlock lock;
+    struct sleeplock lock;
     int id;
     enum mutexstate m_state;
 }pthread_mutex_t;

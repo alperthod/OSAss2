@@ -521,10 +521,17 @@ sleep(void *chan, struct spinlock *lk)
   // guaranteed that we won't miss any wakeup
   // (wakeup runs with ptable.lock locked),
   // so it's okay to release lk.
-  if(lk != &ptable.lock){  //DOC: sleeplock0
+  if (holding(&p->proclock))
+      panic("holding proclock\n");
+  if(lk != &ptable.lock){//} && lk != &p->proclock && (!holding(&p->proclock))){  //DOC: sleeplock0
     acquire(&ptable.lock);  //DOC: sleeplock1
     release(lk);
   }
+//  if (holding(&p->proclock)){
+//      release(&p->proclock);
+//      if (lk != &p->proclock) release(lk);
+//      acquire(&ptable.lock);
+//  }
   acquire(&p->proclock);
   // Go to sleep.
   t->chan = chan;
@@ -733,6 +740,16 @@ int is_last_thread() {
     return last_thread;
 }
 
+// should be called when mtable mutex is held
+pthread_mutex_t * find_mutex(int mutex_id){
+    if (!holding(&mtable.lock))
+        panic("must hold mtable lock");
+    pthread_mutex_t* mutex;
+    for(mutex = mtable.mutexes ; mutex < &mtable.mutexes[MAX_MUTEXES];mutex++)
+        if (mutex->id == mutex_id)
+            return mutex;
+    return 0;
+}
 
 int kthread_mutex_alloc(){
     acquire(&mtable.lock);
@@ -750,69 +767,49 @@ int kthread_mutex_alloc(){
     mutex->id = nextmid++;
 
 // initializing mutexlock
-    initlock(&mutex->lock, "mutex lock");
+    initsleeplock(&mutex->lock, "mutex lock");
     release(&mtable.lock);
     return mutex->id;
-
 }
 
 int kthread_mutex_dealloc(int mutex_id){
-    acquire(&mtable);
-    pthread_mutex_t* mutex;
-    for(mutex = mtable.mutexes ; mutex < &mtable.mutexes[MAX_MUTEXES];mutex++)
-        if (mutex->id == mutex_id)
-            goto found;
-
-    release(&mtable.lock);
-    return -1;
-
-
-    found:
-    if (mutex->m_state = M_LOCKED){
+    pthread_mutex_t * mutex;
+    acquire(&mtable.lock);
+    mutex = find_mutex(mutex_id);
+    if ((mutex == 0) || mutex->m_state == M_UNUSED) {
+        release(&mtable.lock);
         return -1;
     }
-    acquire(&mutex->lock);
-    mutex->m_state = UNUSED;
-    mutex->id = -1;
-    release(&mutex->lock);
+    if(mutex->lock.locked){
+        release(&mtable.lock);
+        return -1;
+    }
+    mutex->m_state = M_UNUSED;
+    mutex->id = 0;
     release(&mtable.lock);
     return 0;
 }
 
 int kthread_mutex_lock(int mutex_id){
-    //acquire(&mtable);             not sure if needed
-    pthread_mutex_t* mutex;
-    for(mutex = mtable.mutexes ; mutex < &mtable.mutexes[MAX_MUTEXES];mutex++)
-        if (mutex->id == mutex_id)
-            goto found;
-
+    pthread_mutex_t * mutex;
+    acquire(&mtable.lock);
+    mutex = find_mutex(mutex_id);
     release(&mtable.lock);
-    return -1;
-
-
-    found:
+    if ((mutex == 0)) {
+        return -1;
+    }
     acquiresleep(&mutex->lock);
-    mutex->m_state = M_LOCKED;
-
-    //release(&mtable.lock);    not sure if needed
     return 0;
 }
 
 int kthread_mutex_unlock(int mutex_id){
-    //acquire(&mtable);             not sure if needed
-    pthread_mutex_t* mutex;
-    for(mutex = mtable.mutexes ; mutex < &mtable.mutexes[MAX_MUTEXES];mutex++)
-        if (mutex->id == mutex_id)
-            goto found;
-
+    pthread_mutex_t * mutex;
+    acquire(&mtable.lock);
+    mutex = find_mutex(mutex_id);
     release(&mtable.lock);
-    return -1;
-
-
-    found:
-
-    mutex->m_state = USED;
+    if ((mutex == 0) || (!holdingsleep(&mutex->lock))) {
+        return -1;
+    }
     releasesleep(&mutex->lock);
-    //release(&mtable.lock);    not sure if needed
     return 0;
 }
