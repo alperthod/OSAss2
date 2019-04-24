@@ -1,8 +1,6 @@
 #ifndef KTHREAD_H_
 #define KTHREAD_H_
 
-#include "user.h"
-
 #define MAX_STACK_SIZE 4000
 #define MAX_MUTEXES 64
 
@@ -65,7 +63,14 @@ trnmnt_tree* trnmnt_tree_alloc(int depth) {
 
     return tree;
 }
-int trnmnt_tree_dealloc(trnmnt_tree* tree);
+int trnmnt_tree_dealloc(trnmnt_tree* tree){
+    for (int i = 0; i < tree->number_of_mutexes - 1; ++i) {
+        kthread_mutex_dealloc(tree->mutex_ids[i]);
+    }
+    free(tree->mutex_ids);
+    free(tree);
+    return 0;
+}
 int trnmnt_tree_acquire(trnmnt_tree* tree,int ID);
 int trnmnt_tree_release(trnmnt_tree* tree,int ID);
 
