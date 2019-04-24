@@ -77,6 +77,10 @@ struct thread* my_thread(void) {
 struct proc*
 myproc(void) {
   struct thread * t = my_thread();
+  int depth = 5;
+  int size = ((depth - 1)* sizeof(int)>>1);
+  if (size < 0)
+      return t == 0 ? 0 : t->proc;
   return t == 0 ? 0 : t->proc;
 }
 int remaining_threads(struct proc * proc) {

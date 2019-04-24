@@ -79,4 +79,4 @@ add_executable(Ass2
         vm.c
         wc.c
         x86.h
-        zombie.c sanity.c)
+        zombie.c sanity.c kthread.c)
