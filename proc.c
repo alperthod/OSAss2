@@ -707,6 +707,10 @@ int kthread_join(int thread_id){
     for (thread = currproc->threads; thread < &currproc->threads[NTHREADS]; thread++){
         if(thread->tid == thread_id){
             if (thread->t_state == T_TERMINATED || thread->t_state == T_UNUSED){
+                kfree(thread->kstack);
+                thread->kstack = 0;
+                thread->tid = 0;
+                thread->t_state = T_UNUSED;
                 release(&currproc->proclock);
                 return 0;
             }
