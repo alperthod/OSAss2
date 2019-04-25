@@ -713,6 +713,10 @@ int kthread_join(int thread_id){
             while (thread->t_state != T_TERMINATED){
                 sleep(currproc, &currproc->proclock);
             }
+            kfree(thread->kstack);
+            thread->kstack = 0;
+            thread->tid = 0;
+            thread->t_state = T_UNUSED;
             release(&currproc->proclock);
             return 0;
         }
