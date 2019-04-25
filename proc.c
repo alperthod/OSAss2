@@ -550,10 +550,11 @@ sleep(void *chan, struct spinlock *lk)
   // (wakeup runs with ptable.lock locked),
   // so it's okay to release lk.
   if (holding(&p->proclock))
-      panic("holding proclock\n");
+      release(&p->proclock);
   if(lk != &ptable.lock){//} && lk != &p->proclock && (!holding(&p->proclock))){  //DOC: sleeplock0
     acquire(&ptable.lock);  //DOC: sleeplock1
-    release(lk);
+    if (lk != &p->proclock)
+        release(lk);
   }
 //  if (holding(&p->proclock)){
 //      release(&p->proclock);
