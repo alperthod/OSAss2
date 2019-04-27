@@ -77,6 +77,10 @@ struct thread* my_thread(void) {
 struct proc*
 myproc(void) {
   struct thread * t = my_thread();
+  int depth = 5;
+  int size = ((depth - 1)* sizeof(int)>>1);
+  if (size < 0)
+      return t == 0 ? 0 : t->proc;
   return t == 0 ? 0 : t->proc;
 }
 int remaining_threads(struct proc * proc) {
@@ -546,10 +550,11 @@ sleep(void *chan, struct spinlock *lk)
   // (wakeup runs with ptable.lock locked),
   // so it's okay to release lk.
   if (holding(&p->proclock))
-      panic("holding proclock\n");
+      release(&p->proclock);
   if(lk != &ptable.lock){//} && lk != &p->proclock && (!holding(&p->proclock))){  //DOC: sleeplock0
     acquire(&ptable.lock);  //DOC: sleeplock1
-    release(lk);
+    if (lk != &p->proclock)
+        release(lk);
   }
 //  if (holding(&p->proclock)){
 //      release(&p->proclock);
@@ -703,6 +708,8 @@ int kthread_create(void (*start_func)(), void * user_stack) {
 int kthread_join(int thread_id){
     struct proc * currproc = myproc();
     struct thread* thread;
+    //verifying thread_id is legal id
+    if (thread_id < 1) return -1;
     acquire(&currproc->proclock);
     for (thread = currproc->threads; thread < &currproc->threads[NTHREADS]; thread++){
         if(thread->tid == thread_id){
