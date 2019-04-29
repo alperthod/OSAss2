@@ -114,7 +114,7 @@ static struct thread* alloc_thread(struct proc* proc) {
         panic("proclock must be held while allocating thread");
     struct thread * t;
     for (t = proc->threads; t < &proc->threads[NTHREADS]; t++) {
-        if (t->t_state != T_UNUSED && t->t_state!= T_TERMINATED)
+        if (t->t_state != T_UNUSED )
             continue;
         t->tid = nextpid++;
         char *sp;
