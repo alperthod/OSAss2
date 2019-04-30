@@ -6,6 +6,7 @@
 #include "defs.h"
 #include "x86.h"
 #include "elf.h"
+#include "kthread.h"
 
 int
 exec(char *path, char **argv)
@@ -88,14 +89,17 @@ exec(char *path, char **argv)
   if(copyout(pgdir, sp, ustack, (3+argc+1)*4) < 0)
     goto bad;
 
+  acquire(&curproc->proclock);
   kill_other_threads();
-  // Save program name for debugging.
+  if (my_thread()->killed)//if process should be killed- finish gracefully
+     goto bad;
+    // Save program name for debugging.
   for(last=s=path; *s; s++)
     if(*s == '/')
       last = s+1;
   safestrcpy(curproc->name, last, sizeof(curproc->name));
 
-  // Commit to the user image.
+    // Commit to the user image.
   oldpgdir = curproc->pgdir;
   curproc->pgdir = pgdir;
   curproc->sz = sz;
@@ -103,6 +107,7 @@ exec(char *path, char **argv)
   curr_thread->tf->esp = sp;
   switchuvm(curr_thread);
   freevm(oldpgdir);
+  release(&curproc->proclock);
   return 0;
 
  bad:

@@ -77,10 +77,6 @@ struct thread* my_thread(void) {
 struct proc*
 myproc(void) {
   struct thread * t = my_thread();
-  int depth = 5;
-  int size = ((depth - 1)* sizeof(int)>>1);
-  if (size < 0)
-      return t == 0 ? 0 : t->proc;
   return t == 0 ? 0 : t->proc;
 }
 int remaining_threads(struct proc * proc) {
@@ -93,18 +89,25 @@ int remaining_threads(struct proc * proc) {
 }
 
 void kill_other_threads() {
+    //assuming proclock is held
+    struct thread* t;
+    struct thread* cur_thread = my_thread();
     struct proc *curproc = myproc();
-
-    acquire(&curproc->proclock);
+    if (!holding(&myproc()->proclock))
+        panic("must hold proclock when killing all threads");
+    if(!cur_thread->killed)
+        return;
     curproc->killed = 1;
-
+    // marking threads as killed to avoid racing in exec
+    for (t = curproc->threads; t < &curproc->threads[NTHREADS]; t++) {
+        if (t->tid != cur_thread->tid)
+            t->killed = 1;
+    }
     // While we are not the only thread running
     while (remaining_threads(curproc) > 1) {
         // Wait for a dying thread to wake us up
         sleep(curproc, &curproc->proclock);
     }
-    release(&curproc->proclock);
-
     // Now our thread is running alone, we can put it back to normal
     curproc->killed = 0;
 }
