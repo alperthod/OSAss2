@@ -173,8 +173,8 @@ void trnmnt_tree_test() {
 }
 
 int main() {
-//    sanity_thread_test();
-//    test_processes_and_mutexes();
+    sanity_thread_test();
+    test_processes_and_mutexes();
     print_mutex = kthread_mutex_alloc();
     trnmnt_tree_test();
     exit();

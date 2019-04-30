@@ -13,6 +13,8 @@ typedef struct {
     int *ids_available; //used to store all threads who locked it
 } trnmnt_tree;
 
+void finish_releasing(const trnmnt_tree *tree, int ID);
+
 int exp2(int exp) { return 1 << exp; }
 
 
@@ -58,7 +60,7 @@ trnmnt_tree *trnmnt_tree_alloc(int depth) {
         free(tree);
     }
     // allocating mutexes, if one fails- clear all and return 0
-    for (int i = 0; i < tree->number_of_mutexes - 1; ++i) {
+    for (int i = 0; i < tree->number_of_mutexes; i++) {
         tree->mutex_ids[i] = kthread_mutex_alloc();
         if (tree->mutex_ids[i] == -1) { // if allocating a mutex failed
             for (int j = i; j >= 0; j++) {
@@ -86,7 +88,7 @@ int trnmnt_tree_dealloc(trnmnt_tree *tree) {
 }
 
 int acquire_helper(trnmnt_tree *tree, int ID) {
-    if (ID >= tree->number_of_mutexes || ID < 0)
+    if (ID >= tree->number_of_mutexes || ID < 0)// checking ID is in bounds
         return -3;
     int lock_result = kthread_mutex_lock(tree->mutex_ids[ID]);
     // if we have reached the last lock to be acquired or acquiring failed
@@ -121,40 +123,52 @@ int release_helper(trnmnt_tree *tree, int original_id, int current_mutex_id, int
         if (left_son(current_mutex_id) == original_id || right_son(current_mutex_id) == original_id)
             return 1;
         else
-            return -1;
+            return -5;
     }
     // now we know that the current depth is not the tree depth and that there is more where to go
-    if (current_mutex_id >= tree->number_of_mutexes || current_mutex_id < 0)
-        return -1;
+    if (current_mutex_id >= tree->number_of_mutexes || current_mutex_id < 0)// if the current mutex id is out of bounds
+        return -6;
     int left_son_released = kthread_mutex_unlock(tree->mutex_ids[left_son(current_mutex_id)]);
     int right_son_released = kthread_mutex_unlock(tree->mutex_ids[right_son(current_mutex_id)]);
     if (left_son_released < 0 && right_son_released < 0) // if both releases failed- fail the operation
-        return -1;
+        return -7;
     if (left_son_released >= 0)
         return release_helper(tree, original_id, left_son(current_mutex_id), current_depth + 1);
     return release_helper(tree, original_id, right_son(current_mutex_id), current_depth + 1);
 }
 
+void finish_releasing(const trnmnt_tree *tree, int ID) {
+    kthread_mutex_lock(tree->mutex_id);
+    tree->ids_available[ID] = 0;
+    kthread_mutex_unlock(tree->mutex_id);
+}
+
 int trnmnt_tree_release(trnmnt_tree *tree, int ID) {
     kthread_mutex_lock(tree->mutex_id);
-    if (!tree->ids_available[ID]) { // if ID is already taken
+    if (tree->ids_available[ID] == 0) { // if ID is already taken
         kthread_mutex_unlock(tree->mutex_id);
         return -1;
     }
     kthread_mutex_unlock(tree->mutex_id);
     // if ID not legal
     if (ID < 0 || ID >= exp2(tree->depth))
-        return -1;
+        return -2;
     if (kthread_mutex_unlock(tree->mutex_ids[0]) == 0) {// if managed to free the first lock
+        // if the tree is of depth 1:
+        // there is only one lock, and therefore we can free the tree now
+        if (tree->depth == 1){
+            finish_releasing(tree, ID);
+            return 1;
+        }
         int release_result = release_helper(tree, ID, 0, 0);
         if (release_result == 0) {
-            kthread_mutex_lock(tree->mutex_id);
-            tree->ids_available[ID] = 0;
-            kthread_mutex_unlock(tree->mutex_id);
+            finish_releasing(tree, ID);
         }
         return release_result;
     }
-    return -1;
+    return -3;
 }
+
+
 
 #endif //ASS2_TOURNAMENT_TREE_H
