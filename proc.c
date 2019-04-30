@@ -743,12 +743,25 @@ int kthread_id(){
     return my_thread()->tid;
 }
 
+void release_mutexes_before_exit(){
+    //releasing all held mutexes
+    acquire(&mtable.lock);
+    pthread_mutex_t* mutex;
+    for(mutex = mtable.mutexes ; mutex < &mtable.mutexes[MAX_MUTEXES];mutex++){
+        if (holdingsleep(&mutex->lock)){
+            releasesleep(&mutex->lock);
+        }
+    }
+    release(&mtable.lock);
+}
+
 void kthread_exit(){
     //struct proc *curproc = myproc();
     struct thread * curr_thread = my_thread();
     struct proc* proc = myproc();
     acquire(&proc->proclock);
     curr_thread->killed = 1;
+    release_mutexes_before_exit();
     if (is_last_thread()) {
         release(&proc->proclock);
         exit();
