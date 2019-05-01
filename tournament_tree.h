@@ -97,6 +97,9 @@ int acquire_helper(trnmnt_tree *tree, int ID) {
     return acquire_helper(tree, father(ID));
 }
 
+int get_first_lock_of_id(trnmnt_tree * tree, int ID){
+    return ((exp2(tree->depth) -1) / 2) + (ID / 2);
+}
 int trnmnt_tree_acquire(trnmnt_tree *tree, int ID) {
     kthread_mutex_lock(tree->mutex_id);
     if (tree->ids_available[ID]) { // if ID is already taken
@@ -106,7 +109,7 @@ int trnmnt_tree_acquire(trnmnt_tree *tree, int ID) {
     tree->ids_available[ID] = 1;
     kthread_mutex_unlock(tree->mutex_id);
 
-    int acquire_result = acquire_helper(tree, father(ID));
+    int acquire_result = acquire_helper(tree, get_first_lock_of_id(tree, ID));
     // if for some reason acquire failed
     if (acquire_result < 0) {
         kthread_mutex_lock(tree->mutex_id);
@@ -120,7 +123,7 @@ int trnmnt_tree_acquire(trnmnt_tree *tree, int ID) {
 int release_helper(trnmnt_tree *tree, int original_id, int current_mutex_id, int current_depth) {
     if (tree->depth - 1 == current_depth){
         // if we have reached the original id- it means all relevant mutexes are released
-        if (left_son(current_mutex_id) == original_id || right_son(current_mutex_id) == original_id)
+        if (current_mutex_id == original_id)
             return 1;
         else
             return -5;
@@ -160,7 +163,7 @@ int trnmnt_tree_release(trnmnt_tree *tree, int ID) {
             finish_releasing(tree, ID);
             return 1;
         }
-        int release_result = release_helper(tree, ID, 0, 0);
+        int release_result = release_helper(tree, get_first_lock_of_id(tree, ID), 0, 0);
         if (release_result == 0) {
             finish_releasing(tree, ID);
         }
