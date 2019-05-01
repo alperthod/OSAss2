@@ -78,6 +78,14 @@ trnmnt_tree *trnmnt_tree_alloc(int depth) {
 }
 
 int trnmnt_tree_dealloc(trnmnt_tree *tree) {
+    kthread_mutex_lock(tree->mutex_id);
+    for (int i = 0 ; i < exp2(tree->depth); i ++){//checking if any lock is still held, and if it is fail the operation
+        if (tree->ids_available[i]) {
+            kthread_mutex_unlock(tree->mutex_id);
+            return -3;
+        }
+    }
+    kthread_mutex_unlock(tree->mutex_id);
     for (int i = 0; i < tree->number_of_mutexes - 1; ++i) {
         kthread_mutex_dealloc(tree->mutex_ids[i]);
     }
