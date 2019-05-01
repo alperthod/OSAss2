@@ -21,12 +21,12 @@ void start() {
  */
 
 static int print_mutex;
+
 void
-sanity_thread_test()
-{
+sanity_thread_test() {
     counter = 0;
     int nthreads = 15;
-    int * thread_ids = malloc(sizeof(int) * nthreads);
+    int *thread_ids = malloc(sizeof(int) * nthreads);
 
     for (int i = 0; i < nthreads; ++i) {
         thread_ids[i] = kthread_create(start, malloc(MAX_STACK_SIZE));
@@ -64,15 +64,14 @@ void start2() {
  * This should print SUCCESS twice.
  */
 void
-test_processes_and_mutexes()
-{
+test_processes_and_mutexes() {
     mutex_id = kthread_mutex_alloc();
     counter = 0;
     int nthreads = 15;
 
     int forkret = fork();
 
-    int * thread_ids = malloc(sizeof(int) * nthreads);
+    int *thread_ids = malloc(sizeof(int) * nthreads);
 
     for (int i = 0; i < nthreads; ++i) {
         thread_ids[i] = kthread_create(start2, malloc(MAX_STACK_SIZE));
@@ -86,8 +85,7 @@ test_processes_and_mutexes()
 
     if (counter == 15) {
         printf(1, "fork and mutex test SUCCESS\n");
-    }
-    else {
+    } else {
         printf(1, "fork and mutex test FAILURE\n");
     }
 
@@ -106,8 +104,8 @@ test_processes_and_mutexes()
  *         Test 3         *
  **************************/
 
-trnmnt_tree* tree;
-int * thread_ids;
+trnmnt_tree *tree;
+int *thread_ids;
 
 void tree_thread() {
     int thread_id = kthread_id();
@@ -132,18 +130,387 @@ void tree_thread() {
     kthread_exit();
 }
 
-void print_tree(trnmnt_tree * tree){
+void print_tree(trnmnt_tree *tree) {
     printf(1, "tree->depth: %d\n", tree->depth);
     printf(1, "tree->number_of_mutexes: %d\n", tree->number_of_mutexes);
     printf(1, "tree->mutex_ids->[");
-    for (int i = 0; i< tree->number_of_mutexes; i++){
-        printf(1, "%d, ",tree->mutex_ids[i]);
+    for (int i = 0; i < tree->number_of_mutexes; i++) {
+        printf(1, "%d, ", tree->mutex_ids[i]);
     }
-    printf(1,"]\n");
+    printf(1, "]\n");
     printf(1, "tree->mutex_id: %d\n", tree->mutex_id);
     printf(1, "tree->number_of_ids_available: %d\n", exp2(tree->depth));
 
 }
+
+/**
+ * allocating tree in depth's 1 to 4, locking the and checking acquire, release and dealloc
+ */
+void basic_mutex_functionality() {
+    int result;
+
+    trnmnt_tree *tree;
+
+    tree = trnmnt_tree_alloc(1);
+    if (tree == 0) {
+        printf(1, "1 trnmnt_tree allocated unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 0);
+    if (result < 0) {
+        printf(1, "1 trnmnt_tree locked unsuccessfully with %d\n", result);
+    }
+
+    result = trnmnt_tree_release(tree, 0);
+    if (result < 0) {
+        printf(1, "1 trnmnt_tree unlocked unsuccessfully with %d\n", result);
+    }
+
+    result = trnmnt_tree_acquire(tree, 1);
+    if (result < 0) {
+        printf(1, "2 trnmnt_tree locked unsuccessfully with %d\n", result);
+    }
+
+    result = trnmnt_tree_release(tree, 1);
+    if (result < 0) {
+        printf(1, "2 trnmnt_tree unlocked unsuccessfully with %d\n", result);
+    }
+
+    result = trnmnt_tree_dealloc(tree);
+    if (result == 0) {}
+    else if (result == -1) {
+        printf(1, "1 trnmnt_tree deallocated unsuccessfully\n");
+    } else {
+        printf(1, "1 unkown return code from trnmnt_tree_dealloc\n");
+    }
+
+
+    tree = trnmnt_tree_alloc(2);
+    if (tree == 0) {
+        printf(1, "2 trnmnt_tree allocated unsuccessfully\n");
+    }
+//    print_tree(tree);
+
+    result = trnmnt_tree_acquire(tree, 0);
+    if (result < 0) {
+        printf(1, "3 trnmnt_tree locked unsuccessfully with %d\n", result);
+    }
+//    print_tree(tree);
+
+    result = trnmnt_tree_release(tree, 0);
+    if (result < 0) {
+        printf(1, "3 trnmnt_tree unlocked unsuccessfully with %d\n", result);
+    }
+//    print_tree(tree);
+
+    result = trnmnt_tree_acquire(tree, 1);
+    if (result < 0) {
+        printf(1, "4 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 1);
+    if (result < 0) {
+        printf(1, "4 trnmnt_tree unlocked unsuccessfully with %d\n", result);
+    }
+
+    result = trnmnt_tree_acquire(tree, 2);
+    if (result < 0) {
+        printf(1, "5 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 2);
+    if (result < 0) {
+        printf(1, "5 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 3);
+    if (result < 0) {
+        printf(1, "6 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 3);
+    if (result < 0) {
+        printf(1, "6 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_dealloc(tree);
+    if (result == 0) {}
+    else if (result == -1) {
+        printf(1, "12 trnmnt_tree deallocated unsuccessfully\n");
+    } else {
+        printf(1, "2 unkown return code from trnmnt_tree_dealloc\n");
+    }
+
+
+    tree = trnmnt_tree_alloc(3);
+    if (tree == 0) {
+        printf(1, "3 trnmnt_tree allocated unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 0);
+    if (result < 0) {
+        printf(1, "7 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 0);
+    if (result < 0) {
+        printf(1, "7 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 1);
+    if (result < 0) {
+        printf(1, "8 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 1);
+    if (result < 0) {
+        printf(1, "8 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 2);
+    if (result < 0) {
+        printf(1, "9 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 2);
+    if (result < 0) {
+        printf(1, "9 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 3);
+    if (result < 0) {
+        printf(1, "10 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 3);
+    if (result < 0) {
+        printf(1, "10 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 4);
+    if (result < 0) {
+        printf(1, "11 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 4);
+    if (result < 0) {
+        printf(1, "11 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 5);
+    if (result < 0) {
+        printf(1, "12 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 5);
+    if (result < 0) {
+        printf(1, "12 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 6);
+    if (result < 0) {
+        printf(1, "13 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 6);
+    if (result < 0) {
+        printf(1, "13 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 7);
+    if (result < 0) {
+        printf(1, "14 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 7);
+    if (result < 0) {
+        printf(1, "14 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_dealloc(tree);
+    if (result == 0) {}
+    else if (result == -1) {
+        printf(1, "3 trnmnt_tree deallocated unsuccessfully\n");
+    } else {
+        printf(1, "3 unkown return code from trnmnt_tree_dealloc\n");
+    }
+
+
+    tree = trnmnt_tree_alloc(4);
+    if (tree == 0) {
+        printf(1, "4 trnmnt_tree allocated unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 0);
+    if (result < 0) {
+        printf(1, "15 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 0);
+    if (result < 0) {
+        printf(1, "15 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 1);
+    if (result < 0) {
+        printf(1, "16 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 1);
+    if (result < 0) {
+        printf(1, "16 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 2);
+    if (result < 0) {
+        printf(1, "17 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 2);
+    if (result < 0) {
+        printf(1, "17 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 3);
+    if (result < 0) {
+        printf(1, "18 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 3);
+    if (result < 0) {
+        printf(1, "18 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 4);
+    if (result < 0) {
+        printf(1, "19 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 4);
+    if (result < 0) {
+        printf(1, "19 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 5);
+    if (result < 0) {
+        printf(1, "20 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 5);
+    if (result < 0) {
+        printf(1, "20 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 6);
+    if (result < 0) {
+        printf(1, "21 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 6);
+    if (result < 0) {
+        printf(1, "21 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 7);
+    if (result < 0) {
+        printf(1, "22 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 7);
+    if (result < 0) {
+        printf(1, "22 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 8);
+    if (result < 0) {
+        printf(1, "23 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 8);
+    if (result < 0) {
+        printf(1, "23 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 9);
+    if (result < 0) {
+        printf(1, "24 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 9);
+    if (result < 0) {
+        printf(1, "24 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 10);
+    if (result < 0) {
+        printf(1, "25 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 10);
+    if (result < 0) {
+        printf(1, "25 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 11);
+    if (result < 0) {
+        printf(1, "26 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 11);
+    if (result < 0) {
+        printf(1, "26 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 12);
+    if (result < 0) {
+        printf(1, "27 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 12);
+    if (result < 0) {
+        printf(1, "27 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 13);
+    if (result < 0) {
+        printf(1, "28 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 13);
+    if (result < 0) {
+        printf(1, "28 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 14);
+    if (result < 0) {
+        printf(1, "29 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 14);
+    if (result < 0) {
+        printf(1, "29 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_acquire(tree, 15);
+    if (result < 0) {
+        printf(1, "30 trnmnt_tree locked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_release(tree, 15);
+    if (result < 0) {
+        printf(1, "30 trnmnt_tree unlocked unsuccessfully\n");
+    }
+
+    result = trnmnt_tree_dealloc(tree);
+    if (result == 0) {}
+    else if (result == -1) {
+        printf(1, "4 trnmnt_tree deallocated unsuccessfully\n");
+    } else {
+        printf(1, "4 unkown return code from trnmnt_tree_dealloc\n");
+    }
+
+}
+
 /**
  * Testing the tournament tree.
  * Creating a tree with depth = 3, running 8 threads, and checking the mutual exclusion is preserved.
@@ -175,7 +542,7 @@ void trnmnt_tree_test() {
 int main() {
     sanity_thread_test();
     test_processes_and_mutexes();
-    print_mutex = kthread_mutex_alloc();
+    basic_mutex_functionality();
     trnmnt_tree_test();
     exit();
 }
