@@ -172,7 +172,7 @@ int trnmnt_tree_release(trnmnt_tree *tree, int ID) {
             return 1;
         }
         int release_result = release_helper(tree, get_first_lock_of_id(tree, ID), 0, 0);
-        if (release_result == 0) {
+        if (release_result == 1) {
             finish_releasing(tree, ID);
         }
         return release_result;
